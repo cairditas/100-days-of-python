@@ -1,9 +1,38 @@
 from tkinter import *
 from tkinter import messagebox
 from random import choice, randint, shuffle
+import functools
+from typing import Dict, Any
 
 import json
 import pyperclip
+
+# ---------------------------- ERROR HANDLING ------------------------------- #
+
+def handle_file_errors(operation_name: str):
+    """Decorator to handle file operation errors consistently."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except FileNotFoundError:
+                if operation_name == "load":
+                    return {}  # Expected for first run
+                messagebox.showerror(title="File Error", message=f"File not found during {operation_name}")
+                return None
+            except json.JSONDecodeError as e:
+                messagebox.showerror(title="Corrupted File", message=f"Invalid JSON data: {e}")
+                return {} if operation_name == "load" else None
+            except (IOError, PermissionError) as e:
+                messagebox.showerror(title="Access Error", message=f"File access error: {e}")
+                return None
+            except Exception as e:
+                messagebox.showerror(title="Unexpected Error", message=f"Unexpected error: {e}")
+                return None
+        return wrapper
+    return decorator   
+
 
 # ---------------------------- PASSWORD GENERATOR ------------------------------- #
 
@@ -32,36 +61,100 @@ def save():
     password = password_entry.get()
 
     # Validate inputs
-    if not website or not email or not password:
+    if not all([website, email, password]):
         messagebox.showinfo(title="Oops", message="Please make sure you haven't left any fields empty.")
         return
     
-    new_data = {
-        website: {
-            "email": email,
-            "password": password
-        }
-    }
+    # Load existing data / create empty dict if file doesn't exist
+    data = load_password_data()
     
-    try:
-        # Read existing data
-        with open("passwords.json", "r") as data_file:
-            data = json.load(data_file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        # Create new file if it doesn't exist or is empty
-        data = {}
-    
-    # Update and save
-    data.update(new_data)
-    with open("passwords.json", "w") as data_file:
-        json.dump(data, data_file, indent=4)
-    
-    # Clear fields
+    # Check for existing entry
+    if website in data:
+        entry_exists = messagebox.askyesno(
+            title="Entry Exists", 
+            message=f"An entry for {website} already exists. Do you want to override it?")
+        if not entry_exists:
+            messagebox.showinfo(title="No new entry", message="Keeping existing entry.")
+            return
+
+     # Save the entry
+    data[website] = {"email": email, "password": password}
+    save_password_data(data)
+
+    # Clear fields and confirm
+    clear_entries()
+    messagebox.showinfo(title="Success", message=f"Password for {website} saved successfully!")
+ 
+
+@handle_file_errors("load")
+def load_password_data() -> Dict[str, Any]:
+    """Load password data from file."""
+    with open("passwords.json", "r") as file:
+        data = json.load(file)
+        if not isinstance(data, dict):
+            messagebox.showwarning(title="Invalid Data", message="Password file contains invalid data. Creating new file.")
+            return {}
+        
+        # Validate the structure
+        if not validate_password_data(data):
+            messagebox.showwarning(title="Invalid Structure", message="Password file has invalid structure. Creating new file.")
+            return {}
+            
+        return data
+ 
+@handle_file_errors("save")
+def save_password_data(data: Dict[str, Any]) -> bool:
+    """Save password data to file."""
+    with open("passwords.json", "w") as file:
+        json.dump(data, file, indent=4)
+    return True
+
+
+def validate_password_data(data: Any) -> bool:
+    """Validate that password data is properly formatted."""
+    return isinstance(data, dict) and all(
+        isinstance(v, dict) and "email" in v and "password" in v 
+        for v in data.values()
+    )
+
+def clear_entries():
+    """Clear all entry fields."""
     website_entry.delete(0, END)
     email_entry.delete(0, END)
     password_entry.delete(0, END)
+
+
+# ---------------------------- SEARCH FOR EXISITNG ENTRIES ------------------------------- #
+
+def search():
+    website = website_entry.get()
+
+    # Validate email
+    if not website:
+        messagebox.showinfo(title="Oops", message="Please enter a website!")
+        return
+
+    data = {}
+    try:
+        with open("passwords.json", "r") as data_file:
+            data = json.load(data_file)
+    except FileNotFoundError:
+        messagebox.showerror(message="No password file exists!")
+    except json.JSONDecodeError:
+        messagebox.showerror(message="Password file unable to be read!")
     
-    messagebox.showinfo(title="Success", message=f"Password for {website} saved successfully!")
+    else:
+        entry = data.get(website)
+        if entry:
+            messagebox.showinfo(title="Entry Found", message=f"Email: {entry['email']}\nPassword: {entry['password']}")
+        else:
+            # Offer to create new entry if not found
+            result = messagebox.askyesno(
+                title="Entry Not Found", 
+                message=f"No entry found for {website}.\n\nWould you like to create one?")
+            if result:
+                # Focus on email field for new entry
+                save()
 
 
 # ---------------------------- UI SETUP ------------------------------- #
@@ -98,7 +191,7 @@ password_entry = Entry(width=21)
 password_entry.grid(row=3, column=1)
 
 # Buttons
-search_password_button = Button(text="Search", width=11)
+search_password_button = Button(text="Search", width=11, command=search)
 search_password_button.grid(row=1, column=2)
 
 generate_password_button = Button(text="Generate", command=generate_password, width=11)
