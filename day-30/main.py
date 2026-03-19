@@ -32,7 +32,7 @@ def save():
     password = password_entry.get()
 
     # Validate inputs
-    if not website or not password:
+    if not website or not email or not password:
         messagebox.showinfo(title="Oops", message="Please make sure you haven't left any fields empty.")
         return
     
@@ -42,7 +42,6 @@ def save():
             "password": password
         }
     }
-
     
     try:
         # Read existing data
@@ -59,6 +58,7 @@ def save():
     
     # Clear fields
     website_entry.delete(0, END)
+    email_entry.delete(0, END)
     password_entry.delete(0, END)
     
     messagebox.showinfo(title="Success", message=f"Password for {website} saved successfully!")
@@ -77,25 +77,33 @@ canvas.grid(row=0, column=1)
 
 #Labels
 website_label = Label(text="Website:")
-website_label.grid(row=1, column=0)
-email_label = Label(text="Email/Username:")
-email_label.grid(row=2, column=0)
+website_label.grid(row=1, column=0, sticky="e")
+
+email_label = Label(text="Email / Username:")
+email_label.grid(row=2, column=0, sticky="e")
+
 password_label = Label(text="Password:")
-password_label.grid(row=3, column=0)
+password_label.grid(row=3, column=0, sticky="e")
 
 #Entries
-website_entry = Entry(width=35)
-website_entry.grid(row=1, column=1, columnspan=2)
+website_entry = Entry(width=21)
+website_entry.grid(row=1, column=1)
 website_entry.focus()
-email_entry = Entry(width=35)
+
+email_entry = Entry(width=37)
 email_entry.grid(row=2, column=1, columnspan=2)
-email_entry.insert(0, "angela@gmail.com")
+email_entry.configure(justify="left")
+
 password_entry = Entry(width=21)
 password_entry.grid(row=3, column=1)
 
 # Buttons
-generate_password_button = Button(text="Generate Password", command=generate_password)
+search_password_button = Button(text="Search", width=11)
+search_password_button.grid(row=1, column=2)
+
+generate_password_button = Button(text="Generate", command=generate_password, width=11)
 generate_password_button.grid(row=3, column=2)
+
 add_button = Button(text="Add", width=36, command=save)
 add_button.grid(row=4, column=1, columnspan=2)
 
