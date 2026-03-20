@@ -1,3 +1,5 @@
 **/passwords.txt
 **/passwords.json
 **/.env
+
+**/__pycache__
